@@ -16,7 +16,7 @@
 # under the Licence.
 
 """
-JET equilibrium data reading routines
+MAST-U equilibrium data reading routines
 """
 
 import pyuda
@@ -81,7 +81,6 @@ class MASTUEquilibrium:
         self.plasma_times = self.client.get("EFM_IP_TIMES", pulse)
 
         self.time_range = self.time_slices.min(), self.time_slices.max()
-
 
     def time(self, time):
         """

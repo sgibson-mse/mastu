@@ -17,7 +17,7 @@
 # under the Licence.
 
 from cherab.tools.equilibrium import plot_equilibrium
-from cherab.mastu.equilibrium.MASTU_equilibrium import MASTUEquilibrium
+from cherab.mastu.equilibrium import MASTUEquilibrium
 
 
 print("Reading equilibrium...")
