@@ -5,8 +5,7 @@
 # European Commission - subsequent versions of the EUPL (the "Licence");
 # You may not use this work except in compliance with the Licence.
 # You may obtain a copy of the Licence at:
-#cd ..
-
+#
 # https://joinup.ec.europa.eu/software/page/eupl5
 #
 # Unless required by applicable law or agreed to in writing, software distributed
