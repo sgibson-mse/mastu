@@ -18,18 +18,10 @@ from cherab.tools.observers import load_calcam_calibration
 from cherab.solps import load_solps_from_mdsplus
 from cherab.openadas import OpenADAS
 
-from cherab.mastu.machine import CENTRE_COLUMN, LOWER_DIVERTOR_ARMOUR
+from cherab.mastu.machine import import_mastu_mesh
 
 world = World()
-
-MESH_PARTS = CENTRE_COLUMN + LOWER_DIVERTOR_ARMOUR
-
-
-for cad_file in MESH_PARTS:
-    directory, filename = os.path.split(cad_file)
-    name, ext = filename.split('.')
-    print("importing {} ...".format(filename))
-    Mesh.from_file(cad_file, parent=world, material=AbsorbingSurface(), name=name)  # material=Lambert(ConstantSF(0.25))
+import_mastu_mesh(world, override_material=AbsorbingSurface())
 
 
 # Load plasma from SOLPS model
@@ -54,9 +46,9 @@ plasma.models = [ExcitationLine(ciii_465)]
 
 
 # Select from available Cameras
-# camera_config = load_calcam_calibration('/home/mcarr/mastu/cameras/mug_bulletb_midplane.nc')
+camera_config = load_calcam_calibration('/home/mcarr/mastu/cameras/mug_bulletb_midplane.nc')
 # camera_config = load_calcam_calibration('/home/mcarr/mastu/cameras/mug_divcam_isp.nc')
-camera_config = load_calcam_calibration('/home/mcarr/mastu/cameras/mug_divcam_sxd.nc')
+# camera_config = load_calcam_calibration('/home/mcarr/mastu/cameras/mug_divcam_sxd.nc')
 
 
 # RGB pipeline for visualisation
