@@ -1,6 +1,10 @@
 
 import os
 
+from raysect.optical.spectralfunction import ConstantSF
+from raysect.optical.material import Lambert
+from raysect.optical.library.metal import RoughTungsten
+
 try:
     CADMESH_PATH = os.environ['CHERAB_CADMESH']
 except KeyError:
@@ -9,44 +13,50 @@ except KeyError:
     else:
         raise ValueError("CHERAB's CAD file path environment variable 'CHERAB_CADMESH' is not set.")
 
+metal_roughness = 0.25
+lambertian_absorption = 0.25
+METAL = RoughTungsten(metal_roughness)
+CARBON = Lambert(ConstantSF(lambertian_absorption))
+
+
 BEAM_DUMPS = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-BEAM DUMPS + GDC.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-BEAM DUMPS + GDC.obj'), CARBON)
 ]
 
 CENTRE_COLUMN = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-CENTRE COLUMN ARMOUR.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-CENTRE COLUMN ARMOUR.obj'), CARBON)
 ]
 
 LOWER_COIL_ARMOUR = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-LOWER COIL ARMOUR.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-LOWER COIL ARMOUR.obj'), CARBON)
 ]
 
 LOWER_COILS = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-LOWER COILS.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-LOWER COILS.obj'), METAL)
 ]
 
 LOWER_ELM_COILS = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-LOWER ELM COILS.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-LOWER ELM COILS.obj'), METAL)
 ]
 
 MAST_VESSEL = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-MAST VESSEL.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-MAST VESSEL.obj'), METAL)
 ]
 
 P3_COILS_LOW_RES = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9_P3_COILS_LOW_RES.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9_P3_COILS_LOW_RES.obj'), METAL)
 ]
 
 UPPER_COIL_ARMOUR = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-UPPER COIL ARMOUR.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-UPPER COIL ARMOUR.obj'), CARBON)
 ]
 
 UPPER_COILS = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-UPPER COILS.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-UPPER COILS.obj'), METAL)
 ]
 
 UPPER_ELM_COILS = [
-    os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-UPPER ELM COILS.obj')
+    (os.path.join(CADMESH_PATH, 'mast/mast-m9/MAST-M9-UPPER ELM COILS.obj'), METAL)
 ]
 
 MAST_FULL_MESH = (

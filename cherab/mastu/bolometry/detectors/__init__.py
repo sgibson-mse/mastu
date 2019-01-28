@@ -1,0 +1,2 @@
+
+from .load_detectors import load_default_bolometer_config
