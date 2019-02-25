@@ -27,6 +27,7 @@ class spectrometer:
         self.wlower = self.wcentre - self.range/2.0
         self.wresol = (self.wupper - self.wlower)/self.pixels
         self.wlngth = np.linspace(self.wlower,self.wupper,self.pixels)
+	print("got here")
         
     def wrange(self):
         self.range=0.0
