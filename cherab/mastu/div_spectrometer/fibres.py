@@ -169,7 +169,7 @@ class fibres:
         from cherab.tools.observers.intersections import find_wall_intersection
         from raysect.core import Vector3D, Point3D
 
-        start_point = Point3D(self.origin[0], self.origin[1], self.origin[2])
+        start_point = Point3D(self.origin[0]+1.0*self.xhat(), self.origin[1]+1.0*self.yhat(), self.origin[2]+1.0*self.zhat())
         forward_vector = Vector3D(self.xhat(), self.yhat(), self.zhat())
 
         hit_point, primitive = find_wall_intersection(world, start_point, forward_vector, delta=1E-3)

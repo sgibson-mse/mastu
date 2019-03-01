@@ -31,10 +31,10 @@ MESH_PARTS = CENTRE_COLUMN + LOWER_DIVERTOR_ARMOUR
 
 
 for cad_file in MESH_PARTS:
-    directory, filename = os.path.split(cad_file)
+    directory, filename = os.path.split(cad_file[0])
     name, ext = filename.split('.')
     print("importing {} ...".format(filename))
-    Mesh.from_file(cad_file, parent=world, material=AbsorbingSurface(), name=name)
+    Mesh.from_file(cad_file[0], parent=world, material=AbsorbingSurface(), name=name)
 
 
 # Load plasma from SOLPS model

@@ -26,6 +26,8 @@ class spectrometer:
         self.wupper = self.wcentre + self.range/2.0
         self.wlower = self.wcentre - self.range/2.0
         self.wresol = (self.wupper - self.wlower)/self.pixels
+        self.wlngth = np.linspace(self.wlower,self.wupper,self.pixels)
+        
     def wrange(self):
         self.range=0.0
         if self.grating == 300:
@@ -60,3 +62,9 @@ class spectrometer:
             #   He I (668/706/728 nm) line ratios
             self.set_grating(300)
             self.set_wcentre(694.0)
+        if setting == 4:
+            # Secondary setting outputs:
+            #   Stark broadening ~ ne
+            #   D[gamma,delta,epsilon] ratio
+            self.set_grating(1200)
+            self.set_wcentre(404.0)
