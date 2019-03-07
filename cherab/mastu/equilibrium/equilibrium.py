@@ -49,6 +49,9 @@ class MASTUEquilibrium:
         # f profile
         self.f = self.client.get("efm_f(psi)_(c)", pulse)# Poloidal current flux function, f=R*Bphi; f(psin, C)
 
+        # q profile
+        self.q = self.client.get("efm_q(psi)_(c)", pulse)
+
         self.psi_r = self.client.get("efm_psi(r)", pulse) #poloidal magnetic flux per toroidal radian as a function of radius at Z=0
 
         # Poloidal magnetic flux per toroidal radian at the plasma boundary and magnetic axis
@@ -67,18 +70,35 @@ class MASTUEquilibrium:
         self.axis_coord_r = self.client.get("efm_magnetic_axis_r", pulse)
         self.axis_coord_z = self.client.get("efm_magnetic_axis_z", pulse)
 
+        # X point coordinates
+        xpoint1r = self.client.get("efm_xpoint1_r(c)", pulse).data
+        xpoint1z = self.client.get("efm_xpoint1_z(c)", pulse).data
+        xpoint2r = self.client.get("efm_xpoint2_r(c)", pulse).data
+        xpoint2z = self.client.get("efm_xpoint2_z(c)", pulse).data
+        self.xpoints = [
+            (Point2D(r1, z1), Point2D(r2, z2))
+            for (r1, z1, r2, z2) in zip(xpoint1r, xpoint1z, xpoint2r, xpoint2z)
+        ]
+
         #minor radius
-        self.minor_radius = self.client.get("EFM_MINOR_RADIUS", pulse)
+        self.minor_radius = self.client.get("efm_minor_radius", pulse)
 
         #lcfs boundary polygon
         self.lcfs_poly_r = self.client.get("efm_lcfs(r)_(c)", pulse)
         self.lcfs_poly_z = self.client.get("efm_lcfs(z)_(c)", pulse)
 
         # Number of LCFS co-ordinates
-        self.nlcfs = self.client.get("EFM_LCFS(N)_(C)", pulse)
+        self.nlcfs = self.client.get("efm_lcfs(n)_(c)", pulse)
+
+        # limiter boundary polygon
+        self.limiter_poly_r = self.client.get("efm_limiter(r)", pulse)
+        self.limiter_poly_z = self.client.get("efm_limiter(z)", pulse)
+
+        # Number of limiter co-ordinates
+        self.nlimiter = self.client.get("efm_limiter(n)", pulse)
 
         # time slices when plasma is present
-        self.plasma_times = self.client.get("EFM_IP_TIMES", pulse)
+        self.plasma_times = self.client.get("efm_ip_times", pulse)
 
         self.time_range = self.time_slices.min(), self.time_slices.max()
 
@@ -101,7 +121,7 @@ class MASTUEquilibrium:
         except IndexError:
             raise ValueError('Requested time lies outside the range of the data: [{}, {}]s.'.format(*self.time_range))
 
-        B_VACUUM_RADIUS = self.b_vacuum_radius.data[index]
+        b_vacuum_radius = self.b_vacuum_radius.data[index]
 
         time = self.time_slices[index]
 
@@ -113,12 +133,14 @@ class MASTUEquilibrium:
 
         print('psi_axis', psi_axis)
 
-        psi_r = self.psi_r.data[:,plasma_index]
-
         f_profile_psin = self.f.dims[1].data
         self.f_profile_psin = f_profile_psin
-
         f_profile_magnitude = self.f.data[plasma_index, :]
+        f_profile = np.asarray([f_profile_psin, f_profile_magnitude])
+
+        q_profile_magnitude = self.q.data[plasma_index]
+        q_profile_psin = self.q.dims[1].data
+        q_profile = np.asarray([q_profile_psin, q_profile_magnitude])
 
         axis_coord = Point2D(self.axis_coord_r.data[plasma_index], self.axis_coord_z.data[plasma_index])
 
@@ -136,17 +158,40 @@ class MASTUEquilibrium:
 
         # convert raw lcfs poly coordinates into a polygon object
         lcfs_polygon = self._process_efit_lcfs_polygon(lcfs_poly_r, lcfs_poly_z)
+        lcfs_polygon = np.ascontiguousarray(lcfs_polygon.T)  # 2xN contiguous
         self.lcfs_polygon = lcfs_polygon
 
-        r = self.r.data[0,:]
-        z = self.z.data[0,:]
+        limiter_poly_r = self.limiter_poly_r.data.squeeze()
+        limiter_poly_z = self.limiter_poly_z.data.squeeze()
+
+        # Get the actual co-ordinates of the limiter
+        limiter_points = self.nlimiter.data.item()
+
+        #Filter out padding in the LIMITER coordinate arrays
+        limiter_poly_r = limiter_poly_r[0:limiter_points]
+        limiter_poly_z = limiter_poly_z[0:limiter_points]
+
+        # convert raw limiter poly coordinates into a polygon object
+        limiter_polygon = self._process_efit_lcfs_polygon(limiter_poly_r, limiter_poly_z)
+        limiter_polygon = np.ascontiguousarray(limiter_polygon.T)  # 2xN contiguous
+        self.limiter_polygon = limiter_polygon
+
+        r = self.r.data.squeeze()
+        z = self.z.data.squeeze()
+
+        xpoints = self.xpoints[plasma_index]
+
+        # MAST-U EFIT has no reliably-available strike point data (ASF not always available)
+        strike_points = []
 
         minor_radius = self.minor_radius.data[plasma_index]
 
         print('minor radius', minor_radius)
 
-        return EFITEquilibrium(r, z, psi, psi_axis, psi_lcfs, axis_coord, f_profile_psin,
-                               f_profile_magnitude, B_VACUUM_RADIUS, b_vacuum_magnitude, lcfs_polygon, time)
+        return EFITEquilibrium(r, z, psi, psi_axis, psi_lcfs, axis_coord,
+                               xpoints, strike_points, f_profile, q_profile,
+                               b_vacuum_radius, b_vacuum_magnitude,
+                               lcfs_polygon, limiter_polygon, time)
 
     @staticmethod
     def _find_nearest(array, value):
