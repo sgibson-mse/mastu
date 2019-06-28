@@ -1,6 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+plt.ion()
 
 from scipy.constants import electron_mass, atomic_mass
 
@@ -18,12 +19,16 @@ from cherab.core.atomic import hydrogen, deuterium, carbon, Line
 from cherab.core.atomic import elements
 
 from cherab.core.model import SingleRayAttenuator, BeamEmissionLine, ExcitationLine, RecombinationLine
+from cherab.core.model import BeamCXLine
 from cherab.core.model.beam.beam_emission import SIGMA_TO_PI, SIGMA1_TO_SIGMA0, PI2_TO_PI3, PI4_TO_PI3
 
 from cherab.openadas import OpenADAS
 
 from cherab.mastu.equilibrium import MASTUEquilibrium
 from cherab.tools.equilibrium import plot_equilibrium
+
+from cherab.mastu.nbi.pini import load_debugging_pini
+from cherab.mastu.mse import load_mse_sightlines
 
 
 import pyuda
@@ -105,6 +110,9 @@ def get_2d_HRTS_profiles(time, r_values, values, profile_name, plot):
 
     values_1d = values.data[tidx,mask]
     psi_n = data_psi[mask]
+
+    # values_1d = np.append(values_1d, [0.0])
+    # psi_n = np.append(psi_n, [1.0])
 
     profile_1d = Interpolate1DCubic(psi_n, values_1d, extrapolate=True)
 
@@ -204,6 +212,8 @@ t_radius = client.get("ayc_r", pulse)  # Radial co-ordinates
 
 #get electron density and ion temperature profiles
 
+#add a zero to the end of density and psi profiles to make sure there is a definite end to the plasma to make sure the beam attenuation is right
+
 psin, ti_1d, ti_2d = get_2d_HRTS_profiles(time, t_radius, ti_values, profile_name='Ion Temperature', plot=plot)
 psin, ne_1d, ne_2d = get_2d_HRTS_profiles(time, t_radius, ne_values, profile_name='Electron Density', plot=plot)
 
@@ -236,126 +246,64 @@ c6 = Species(carbon, 6, c6_distribution) # Carbon, charge 6
 plasma.electron_distribution = e_distribution
 plasma.composition = [d0, d1, c6] #plasma made up of D, D+ and C6
 
-sigma = 0.25
-integration_step = 0.02
-
 # # Define the plasma geometry - cylindrical geometry
 
+PLASMA_WIDTH = 2
+PLASMA_HEIGHT = 4
+integration_step = 0.02
 plasma.integrator.step = integration_step
 plasma.integrator.min_samples = 1000
-plasma.geometry = Cylinder(sigma * 2, sigma * 10.0)
-plasma.geometry_transform = translate(0, -sigma * 5.0, 0) * rotate(0, 90, 0)
+plasma.geometry = Cylinder(PLASMA_WIDTH, PLASMA_HEIGHT)
+plasma.geometry_transform = translate(0, 0, -PLASMA_HEIGHT/2)
 
 # Add background emission
 d_alpha = Line(deuterium, 0, (3, 2))
 
 #Add the atomic model to the plasma, here we just have excitation and recombination. NB: Should add more to this later
 
-plasma.models = [ExcitationLine(d_alpha), RecombinationLine(d_alpha)]
+# plasma.models = [ExcitationLine(d_alpha), RecombinationLine(d_alpha)]
 
 
 # ######## Neutral Beam #########
 #
 #Position of SS PINI grid and SS Duct in machine co-ordinates
 
-pini_pos = Point3D(0.188819939,-6.88824321,0.0)
-duct_pos = Point3D(0.539, -1.926, 0.00)
 
-# Calculate the beam vector
-
-beam_vector = pini_pos.vector_to(duct_pos).normalise()
-
-up = Vector3D(0,0,1)
-
-#Rotate the beam to be along Z
-
-beam_rotation = rotate_basis(beam_vector, up)
-
-#Move the beam to the pini position
-
-beam_translation = translate(pini_pos.x, pini_pos.y, pini_pos.z)
-
-beam_energy = 70000  # eV
-beam_current = 10  # Amps
-beam_sigma = 0.025
-beam_divergence = 0.5 # Degrees
-beam_length = 10.0 # m
-beam_temperature = 20 #eV
-
-bes_full_model = BeamEmissionLine(Line(deuterium, 0, (3, 2)), sigma_to_pi=SIGMA_TO_PI, sigma1_to_sigma0=SIGMA1_TO_SIGMA0,
-                                  pi2_to_pi3=PI2_TO_PI3, pi4_to_pi3=PI4_TO_PI3)
-
-beam_full = Beam(parent=world, transform=beam_translation*beam_rotation)
-beam_full.plasma = plasma
-beam_full.atomic_data = adas
-beam_full.energy = beam_energy
-beam_full.power = 7e5  # beam_energy * beam_current
-beam_full.temperature = beam_temperature
-beam_full.element = deuterium
-beam_full.sigma = beam_sigma
-beam_full.divergence_x = beam_divergence
-beam_full.divergence_y = beam_divergence
-beam_full.length = beam_length
-beam_full.attenuator = SingleRayAttenuator(clamp_to_zero=True)
-beam_full.models = [bes_full_model]
-beam_full.integrator.step = integration_step
-beam_full.integrator.min_samples = 10
-
-#Rotating back to local co-ordinates
-
-to_local = (beam_translation*beam_rotation).inverse()
-
-#Sample some points along the beam
-
-beam_density = []
-xb, yb, zb = [], [], []
-
-samples = np.linspace(0,10,500)
-
-for sample in samples:
-
-        sample_point = pini_pos + beam_vector*sample
-
-        local_point = sample_point.transform(to_local)
-
-        beam_density.append(beam_full.density(local_point.x, local_point.y, local_point.z))
-
-        xb.append(sample_point.x)
-        yb.append(sample_point.y)
-        zb.append(sample_point.z)
-
-# ##### Observation #####
-
-los = Point3D(-0.949, -2.228,  0)
-los_vector = Vector3D(0.75, 0.662, 0).normalise()
-
-los_x, los_y, los_z = [], [], []
-
-for sample in samples:
-    los_sample = los + los_vector * sample
-    los_x.append(los_sample[0])
-    los_y.append(los_sample[1])
-    los_z.append(los_sample[2])
-
-# ### Plot the Geometry and LOS #######
-
-theta = np.arange(0,360,1)*np.pi/180.
-r_in = 0.7
-r_out = 2.35
+attenuator = (SingleRayAttenuator, {'clamp_to_zero': True}) # Need a single ray attenuator for each beamlet.
+# emission_models = [(BeamCXLine, {'line':Line(carbon, 5, (8, 7))})]
+# emission_models = [(BeamCXLine, {'line':Line(deuterium, 0, (3, 2))})]
+emission_models = [(BeamEmissionLine, {'line':Line(deuterium, 0, (3, 2)), 'sigma_to_pi': SIGMA_TO_PI, 'sigma1_to_sigma0':SIGMA1_TO_SIGMA0,
+                                       'pi2_to_pi3':PI2_TO_PI3, 'pi4_to_pi3':PI4_TO_PI3})]
+mast_pini = load_debugging_pini(plasma, adas, attenuator, emission_models, world, integration_step=0.02)
+full, half, third = mast_pini.components
 
 plt.figure()
+x, _, z, beam_density = sample3d(full.density, (-1, 1, 200), (0, 0, 1), (4, 7, 200))
+plt.imshow(np.transpose(np.squeeze(beam_density)), extent=[-1, 1, 4, 7], origin='lower')
+plt.colorbar()
+plt.axis('equal')
+plt.xlabel('x axis (beam coords)')
+plt.ylabel('z axis (beam coords)')
+plt.title("Beam full energy density profile in r-z plane")
 
-plt.plot(los_x, los_y, label='LOS Vector')
-plt.plot(xb, yb, label='Beam vector')
-plt.plot(r_in * np.cos(theta), r_in * np.sin(theta), color='black')
-plt.plot(r_out * np.cos(theta), r_out * np.sin(theta), color='black')
-plt.plot(duct_pos.x, duct_pos.y, 'o', label='duct')
-plt.plot(pini_pos.x, pini_pos.y, 'o', label='pini')
-plt.plot(los.x, los.y, 'o', label='MSE port')
-plt.xlim(-8,8)
-plt.ylim(-8,8)
+z = np.linspace(4, 7, 200)
+
+beam_full_densities = [full.density(0, 0, zz) for zz in z]
+beam_half_densities = [half.density(0, 0, zz) for zz in z]
+beam_third_densities = [third.density(0, 0, zz) for zz in z]
+plt.figure()
+plt.plot(z, beam_full_densities, label="full energy")
+plt.plot(z, beam_half_densities, label="half energy")
+plt.plot(z, beam_third_densities, label="third energy")
+plt.xlabel('z axis (beam coords)')
+plt.ylabel('beam component density [m^-3]')
+plt.title("Beam attenuation by energy component")
 plt.legend()
 plt.show()
+
+# # ##### Observation #####
+
+los, los_vector = load_mse_sightlines()
 
 ray = Ray(origin=Point3D(los.x, los.y, los.z), direction=los_vector, min_wavelength=600, max_wavelength=680, bins=2000)
 s = ray.trace(world)
@@ -366,7 +314,16 @@ plt.ylabel('Radiance (W/m^2/str/nm)')
 plt.title('Sampled BES Spectrum')
 plt.show()
 
-# camera = PinholeCamera((256, 256), fov=52.9, parent=world, transform=translate(0,0,3)*rotate_basis(Vector3D(0,0,-1), Vector3D(1,0,0))) #translate(0, 0, 3)*rotate_basis(Vector3D(0, 0, -1), Vector3D(1, 0, 0)) )
+print()
+print(s.samples.min(), s.samples.max())
+
+
+# camera = PinholeCamera((256, 256), parent=world, transform=translate(0.6, -1, 7)*rotate_basis(Vector3D(0, 0, -1), Vector3D(0, 1, 0)))
+# camera.pixel_samples = 50
+# camera.spectral_bins = 15
+# camera.observe()
+#
+# camera = PinholeCamera((256, 256), fov=52.9, parent=world, transform=translate(*los)*rotate_basis(Vector3D(*los_vector), Vector3D(0, 0, 1)))
 # camera.pixel_samples = 50
 # camera.spectral_bins = 15
 # camera.observe()
